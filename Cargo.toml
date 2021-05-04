@@ -35,3 +35,12 @@ overflow-checks = true
 
 [profile.bench]
 overflow-checks = true
+
+[patch.crates-io]
+luminance = { git = "https://github.com/phaazon/luminance-rs.git", branch = "master" }
+luminance-derive = { git = "https://github.com/phaazon/luminance-rs.git", branch = "master" }
+luminance-gl = { git = "https://github.com/phaazon/luminance-rs.git", branch = "master" }
+luminance-glfw = { git = "https://github.com/phaazon/luminance-rs.git", branch = "master" }
+luminance-web-sys = { git = "https://github.com/phaazon/luminance-rs.git", branch = "master" }
+luminance-webgl = { git = "https://github.com/phaazon/luminance-rs.git", branch = "master" }
+luminance-windowing = { git = "https://github.com/phaazon/luminance-rs.git", branch = "master" }
