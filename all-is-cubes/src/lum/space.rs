@@ -138,17 +138,11 @@ impl<Backend: AicLumBackend> SpaceRenderer<Backend> {
                 update_chunk_tess(context, triangulation, render_data);
             },
             |triangulation, render_data| {
-                // Disable dynamic depth sorting because luminance bug
-                // https://github.com/phaazon/luminance-rs/issues/483
-                // means indices_mut() can fail and corrupt other buffers.
-                // TODO: Reenble this and also in-place chunk updating when bug is fixed
-                if !cfg!(target_family = "wasm") {
-                    if let Some(tess) = render_data {
-                        let range = triangulation.transparent_range(DepthOrdering::Within);
-                        tess.indices_mut()
-                            .expect("failed to map indices for depth sorting")[range.clone()]
-                        .copy_from_slice(&triangulation.indices()[range]);
-                    }
+                if let Some(tess) = render_data {
+                    let range = triangulation.transparent_range(DepthOrdering::Within);
+                    tess.indices_mut()
+                        .expect("failed to map indices for depth sorting")[range.clone()]
+                    .copy_from_slice(&triangulation.indices()[range]);
                 }
             },
         );
@@ -480,9 +474,6 @@ fn update_chunk_tess<C>(
     let existing_tess_size_ok = if let Some(tess) = tess_option.as_ref() {
         tess.vert_nb() == new_triangulation.vertices().len()
             && tess.idx_nb() == new_triangulation.indices().len()
-            // TODO: workaround for https://github.com/phaazon/luminance-rs/issues/483
-            // which makes modifying existing Tesses fail
-            && !cfg!(target_family = "wasm")
     } else {
         false
     };
