@@ -23,7 +23,7 @@ cgmath = "0.18.0"
 clap = "2.33.3"
 crossterm = "0.21.0"
 directories-next = "2.0.0"
-glfw = "0.41"
+glfw = "0.42"
 indicatif = { version = "0.16.0", default-features = false }
 log = { version = "0.4.14", default-features = false }
 luminance = "0.44.0"

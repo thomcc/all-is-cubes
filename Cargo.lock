@@ -82,7 +82,7 @@ dependencies = [
  "clap",
  "crossterm",
  "directories-next",
- "glfw 0.41.0",
+ "glfw",
  "indicatif",
  "log",
  "luminance",
@@ -1210,21 +1210,6 @@ dependencies = [
 
 [[package]]
 name = "glfw"
-version = "0.41.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbb254ad1715644ab078c94372405bf061358b97969635ef7b09cf6f9437843e"
-dependencies = [
- "bitflags",
- "glfw-sys",
- "log",
- "objc",
- "raw-window-handle",
- "semver 0.9.0",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "glfw"
 version = "0.42.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06a3f9afbfd6576fca75be1e5cfc6db259b3a9b65844d34890b0711e82953605"
@@ -1753,7 +1738,7 @@ version = "0.16.0"
 source = "git+https://github.com/phaazon/luminance-rs.git?branch=master#16a8af83a59484d7e8be41b49b2cfabff864126e"
 dependencies = [
  "gl",
- "glfw 0.42.0",
+ "glfw",
  "luminance",
  "luminance-gl",
  "luminance-windowing",

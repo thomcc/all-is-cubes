@@ -43,8 +43,8 @@ mod backend {
         + TessGate<(), (), (), Interleaved>
         + TessGate<LumBlockVertex, (), (), Interleaved>
         + TessGate<LumBlockVertex, u32, (), Interleaved>
-        + VertexSlice<LumBlockVertex, u32, (), Interleaved, LumBlockVertex>
-        + IndexSlice<LumBlockVertex, u32, (), Interleaved>
+        + for<'a> VertexSlice<'a, LumBlockVertex, u32, (), Interleaved, LumBlockVertex>
+        + for<'a> IndexSlice<'a, LumBlockVertex, u32, (), Interleaved>
     where
         (): luminance::backend::depth_slot::DepthSlot<Self, Dim2>,
     {
@@ -61,8 +61,8 @@ mod backend {
             + TessGate<(), (), (), Interleaved>
             + TessGate<LumBlockVertex, (), (), Interleaved>
             + TessGate<LumBlockVertex, u32, (), Interleaved>
-            + VertexSlice<LumBlockVertex, u32, (), Interleaved, LumBlockVertex>
-            + IndexSlice<LumBlockVertex, u32, (), Interleaved>,
+            + for<'a> VertexSlice<'a, LumBlockVertex, u32, (), Interleaved, LumBlockVertex>
+            + for<'a> IndexSlice<'a, LumBlockVertex, u32, (), Interleaved>,
         // These not-on-self bounds don't seem to actually help when put on the trait, but
         // putting them here at least centrally documents that we need them.
         f32: Uniformable<Self>,
