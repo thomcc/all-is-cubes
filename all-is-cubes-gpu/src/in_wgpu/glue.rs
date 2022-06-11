@@ -133,35 +133,6 @@ pub fn size_vector_to_extent(size: Vector3<GridCoordinate>) -> wgpu::Extent3d {
     }
 }
 
-pub(crate) struct BeltWritingParts<'sh, 'mu> {
-    pub device: &'sh wgpu::Device,
-    pub belt: &'mu mut wgpu::util::StagingBelt,
-    pub encoder: &'mu mut wgpu::CommandEncoder,
-}
-
-impl<'sh, 'mu> BeltWritingParts<'sh, 'mu> {
-    pub fn reborrow<'r>(&'r mut self) -> BeltWritingParts<'sh, 'r>
-    where
-        'mu: 'r,
-    {
-        BeltWritingParts {
-            device: self.device,
-            belt: self.belt,
-            encoder: self.encoder,
-        }
-    }
-
-    pub fn write_buffer(
-        &mut self,
-        target: &wgpu::Buffer,
-        offset: wgpu::BufferAddress,
-        size: wgpu::BufferSize,
-    ) -> wgpu::BufferViewMut<'_> {
-        self.belt
-            .write_buffer(self.encoder, target, offset, size, self.device)
-    }
-}
-
 /// A [`wgpu::Buffer`] wrapper that allows loading differently-sized data with automatic
 /// reallocation as needed. Also supports not yet having allocated a buffer.
 ///
@@ -191,7 +162,8 @@ impl ResizingBuffer {
     /// if the existing buffer is used. TODO: Provide a means of lazy loading the label.
     pub(crate) fn write_with_resizing(
         &mut self,
-        mut bwp: BeltWritingParts<'_, '_>,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
         descriptor: &wgpu::util::BufferInitDescriptor<'_>,
     ) {
         let new_size: u64 = descriptor.contents.len().try_into().unwrap();
@@ -200,19 +172,18 @@ impl ResizingBuffer {
             // Create buffers lazily until we have 3.
             self.buffers.push_front(SizedBuffer {
                 capacity: new_size,
-                buffer: bwp.device.create_buffer_init(descriptor),
+                buffer: device.create_buffer_init(descriptor),
             });
         } else {
             let mut b = self.buffers.pop_back().unwrap();
             if b.capacity >= new_size {
-                if let Some(new_size) = wgpu::BufferSize::new(new_size) {
-                    bwp.write_buffer(&b.buffer, 0, new_size)
-                        .copy_from_slice(descriptor.contents);
+                if new_size > 0 {
+                    queue.write_buffer(&b.buffer, 0, descriptor.contents);
                 }
             } else {
                 b = SizedBuffer {
                     capacity: new_size,
-                    buffer: bwp.device.create_buffer_init(descriptor),
+                    buffer: device.create_buffer_init(descriptor),
                 };
             }
             self.buffers.push_front(b);

@@ -3,7 +3,6 @@
 
 //! Manages meshes for rendering a [`Space`].
 
-use std::cell::RefCell;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, Weak};
 
@@ -24,7 +23,7 @@ use crate::in_wgpu::pipelines::Pipelines;
 use crate::in_wgpu::{
     block_texture::{AtlasAllocator, AtlasTile},
     camera::ShaderSpaceCamera,
-    glue::{to_wgpu_index_range, BeltWritingParts, ResizingBuffer},
+    glue::{to_wgpu_index_range, ResizingBuffer},
     vertex::WgpuBlockVertex,
 };
 use crate::{GraphicsResourceError, SpaceDrawInfo, SpaceUpdateInfo};
@@ -143,9 +142,9 @@ impl SpaceRenderer {
     pub(crate) fn update(
         &mut self,
         deadline: Instant,
+        device: &wgpu::Device,
         queue: &wgpu::Queue,
         camera: &Camera,
-        bwp: BeltWritingParts<'_, '_>,
     ) -> Result<SpaceUpdateInfo, GraphicsResourceError> {
         let mut todo = self.todo.lock().unwrap();
 
@@ -174,30 +173,19 @@ impl SpaceRenderer {
         }
         let end_light_update = Instant::now();
 
-        // TODO: kludge; refactor to avoid needing it
-        let rcbwp = RefCell::new(bwp);
-
         // Update chunks
         let csm_info = self.csm.update_blocks_and_some_chunks(
             camera,
             &mut self.block_texture,
             deadline, // TODO: decrease deadline by some guess at texture writing time
             |mesh, render_data| {
-                update_chunk_buffers(rcbwp.borrow_mut().reborrow(), mesh, render_data);
+                update_chunk_buffers(device, queue, mesh, render_data);
             },
             |mesh, render_data| {
                 if let Some(index_buf) = render_data.as_ref().and_then(|b| b.index_buf.get()) {
                     let index_buf_bytes = bytemuck::cast_slice::<u32, u8>(mesh.indices());
-                    if let Some(len) = index_buf_bytes
-                        .len()
-                        .try_into()
-                        .ok()
-                        .and_then(wgpu::BufferSize::new)
-                    {
-                        rcbwp
-                            .borrow_mut()
-                            .write_buffer(index_buf, 0, len)
-                            .copy_from_slice(index_buf_bytes);
+                    if !index_buf_bytes.is_empty() {
+                        queue.write_buffer(index_buf, 0, index_buf_bytes);
                     }
                 }
             },
@@ -371,7 +359,8 @@ fn set_buffers<'a>(render_pass: &mut wgpu::RenderPass<'a>, buffers: &'a ChunkBuf
 
 /// Copy [`SpaceMesh`] data to GPU buffers.
 fn update_chunk_buffers(
-    mut bwp: BeltWritingParts<'_, '_>,
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
     new_mesh: &SpaceMesh<WgpuBlockVertex, AtlasTile>,
     buffers: &mut Option<ChunkBuffers>,
 ) {
@@ -386,7 +375,8 @@ fn update_chunk_buffers(
 
     let buffers = buffers.get_or_insert_with(ChunkBuffers::default);
     buffers.vertex_buf.write_with_resizing(
-        bwp.reborrow(),
+        device,
+        queue,
         &wgpu::util::BufferInitDescriptor {
             // TODO: Get the space's label and chunk coordinates here (cheaply)
             label: Some("Chunk vertex buffer"),
@@ -395,7 +385,8 @@ fn update_chunk_buffers(
         },
     );
     buffers.index_buf.write_with_resizing(
-        bwp.reborrow(),
+        device,
+        queue,
         &wgpu::util::BufferInitDescriptor {
             label: Some("Chunk index buffer"),
             contents: new_indices_data,

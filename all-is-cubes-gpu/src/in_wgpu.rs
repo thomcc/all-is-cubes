@@ -7,7 +7,6 @@
 
 use std::{mem, sync::Arc};
 
-use futures_core::future::BoxFuture;
 use instant::Instant;
 use once_cell::sync::Lazy;
 
@@ -24,11 +23,9 @@ use crate::{
     gather_debug_lines,
     in_wgpu::{
         camera::ShaderPostprocessCamera,
-        glue::{
-            create_wgsl_module_from_reloadable, to_wgpu_color, BeltWritingParts, ResizingBuffer,
-        },
+        glue::{create_wgsl_module_from_reloadable, to_wgpu_color, ResizingBuffer},
         pipelines::Pipelines,
-        vertex::{WgpuBlockVertex, WgpuLinesVertex},
+        vertex::WgpuLinesVertex,
     },
     reloadable::{reloadable_str, Reloadable},
     wireframe_vertices, DrawInfo, FrameBudget, SpaceDrawInfo, SpaceUpdateInfo, UpdateInfo,
@@ -50,8 +47,7 @@ pub(crate) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth3
 
 /// Entry point for [`wgpu`] rendering. Construct this and hand it the [`wgpu::Surface`]
 /// to draw on.
-//#[derive(Debug)]
-#[allow(missing_debug_implementations)] // TODO: wgpu::util::StagingBelt isn't Debug (will be in the future)
+#[derive(Debug)]
 pub struct SurfaceRenderer {
     surface: wgpu::Surface,
     device: Arc<wgpu::Device>,
@@ -163,15 +159,9 @@ impl SurfaceRenderer {
 /// All the state, both CPU and GPU-side, that is needed for drawing a complete
 /// scene and UI, but not the surface it's drawn on. This may be used in tests or
 /// to support
-//#[derive(Debug)]
-#[allow(missing_debug_implementations)] // TODO: wgpu::util::StagingBelt isn't Debug (will be in the future)
+#[derive(Debug)]
 pub struct EverythingRenderer {
     device: Arc<wgpu::Device>,
-
-    staging_belt: wgpu::util::StagingBelt,
-    /// Future indicating the `staging_belt.recall()` has completed and it can be reused.
-    /// TODO: When Rust has type_alias_impl_trait we can use that here instead of boxing.
-    staging_belt_recalled: Option<BoxFuture<'static, ()>>,
 
     cameras: StandardCameras,
 
@@ -281,12 +271,6 @@ impl EverythingRenderer {
         let pipelines = Pipelines::new(&device, LINEAR_COLOR_FORMAT);
 
         let mut new_self = EverythingRenderer {
-            staging_belt: wgpu::util::StagingBelt::new(
-                // TODO: wild guess at good size
-                std::mem::size_of::<WgpuBlockVertex>() as wgpu::BufferAddress * 4096,
-            ),
-            staging_belt_recalled: None,
-
             linear_scene_texture_view: linear_scene_texture
                 .create_view(&wgpu::TextureViewDescriptor::default()),
             linear_scene_texture,
@@ -485,25 +469,11 @@ impl EverythingRenderer {
                 .transpose()?;
         }
 
-        let mut encoder = self
+        let encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("EverythingRenderer::update()"),
             });
-
-        // Await completion of previous frame's work.
-        // This must be done, at the latest, just before we start using the `StagingBelt`
-        // again, so we do it just before constructing `BeltWritingParts`.
-        // TODO: Measure and report this time separately.
-        if let Some(future) = self.staging_belt_recalled.take() {
-            let () = future.await;
-        }
-
-        let mut bwp = BeltWritingParts {
-            device: &*self.device,
-            belt: &mut self.staging_belt,
-            encoder: &mut encoder,
-        };
 
         let world_deadline = Instant::now() + frame_budget.update_meshes.world;
         let ui_deadline = world_deadline + frame_budget.update_meshes.ui;
@@ -516,9 +486,9 @@ impl EverythingRenderer {
                 .map(|sr| {
                     sr.update(
                         world_deadline,
+                        &self.device,
                         queue,
                         &self.cameras.cameras().world,
-                        bwp.reborrow(),
                     )
                 })
                 .transpose()?
@@ -527,14 +497,7 @@ impl EverythingRenderer {
                 .space_renderers
                 .ui
                 .as_mut()
-                .map(|sr| {
-                    sr.update(
-                        ui_deadline,
-                        queue,
-                        &self.cameras.cameras().ui,
-                        bwp.reborrow(),
-                    )
-                })
+                .map(|sr| sr.update(ui_deadline, &self.device, queue, &self.cameras.cameras().ui))
                 .transpose()?
                 .unwrap_or_default(),
         };
@@ -558,7 +521,8 @@ impl EverythingRenderer {
             );
 
             self.lines_buffer.write_with_resizing(
-                bwp.reborrow(),
+                &self.device,
+                queue,
                 &wgpu::util::BufferInitDescriptor {
                     label: Some("EverythingRenderer::lines_buffer"),
                     contents: bytemuck::cast_slice(&*v),
@@ -568,8 +532,7 @@ impl EverythingRenderer {
             self.lines_vertex_count = v.len() as u32;
         };
 
-        // TODO: measure time of these
-        self.staging_belt.finish();
+        // TODO: measure time of this
         queue.submit(std::iter::once(encoder.finish()));
 
         Ok(UpdateInfo {
@@ -685,7 +648,6 @@ impl EverythingRenderer {
         );
 
         queue.submit(std::iter::once(encoder.finish()));
-        self.staging_belt_recalled = Some(Box::pin(self.staging_belt.recall()));
 
         let end_time = Instant::now();
         Ok(DrawInfo {
