@@ -1,0 +1,68 @@
+<!doctype html>
+<!--
+   Copyright 2020-2022 Kevin Reid under the terms of the MIT License as detailed
+   in the accompanying file README.md or <https://opensource.org/licenses/MIT>.
+-->
+<html id="app-root" class="state-script-not-loaded"><head>
+  <title>All is Cubes</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width">
+  <link rel="stylesheet" href="style.css" type="text/css">
+  <script defer src="index.js"></script>
+</head><body>
+
+<div class="overlay-bounds">
+  <canvas id="view-canvas" tabindex="0" class="viewport" width="640" height="480">
+    <!-- Only visible to browsers which do not recognize <canvas> -->
+    <div class="error-notice">
+      <p>Sorry, but the web browser you are using does not appear to support WebGL.</p>
+    </div>
+  </canvas>
+  <div id="scene-info-overlay" class="overlay">
+    <pre>Move: WS AD EC — Turn: ←→ ↑↓ or L for mouselook — Delete: left click — Place: right click — Select items: 0-9.</pre>
+    <progress id="loading-progress-bar" value="0.0" min="0.0" max="1.0"></progress>
+    <pre id="loading-log">JavaScript not loaded...</pre>
+    <pre id="scene-info-text"></pre>
+  </div>
+  <div id="world-overlays"></div>
+  <div id="toggles">
+    <!-- TODO: Reimplement this feature
+      <button id="save-button" onclick="main.save(); document.getElementById('view-canvas').focus(); return false;">Save</button>
+    -->
+    <button id="fullscreen-button">Full screen</button>
+    <script>(function () {
+      // TODO: pull this out into JS/Rust file just for systematic organization.
+      "use strict";
+      const button = document.getElementById("fullscreen-button");
+      const ourFullscreenElement = document.body;
+
+      button.addEventListener("click", event => {
+        if (document.body.requestFullscreen) {
+          document.body.requestFullscreen();
+        } else if (document.body.webkitRequestFullscreen) {
+          // Safari still has no unprefixed requestFullscreen as of version 15.1
+          document.body.webkitRequestFullscreen();
+        } else {
+          alert("Full screen not supported, apparently.");
+        }
+        document.getElementById('view-canvas').focus();
+        event.stopPropagation();
+      }, false);
+
+      document.addEventListener("fullscreenchange", event => {
+        if (document.fullscreenElement === ourFullscreenElement) {
+          button.style.visibility = "hidden";
+        } else {
+          button.style.removeProperty("visibility");
+        }
+      }, false);
+    }())</script>
+    <!-- TODO: Reimplement this feature
+      <button onclick="main.ui.openPanelFromButton('objects');">Worlds</button>
+      <button onclick="main.ui.openPanelFromButton('options');">Options</button>
+      <button onclick="main.ui.openPanelFromButton('help');">Help</button>
+    -->
+  </div>
+</div>
+
+</body></html>
