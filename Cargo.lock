@@ -118,6 +118,7 @@ dependencies = [
  "simplelog",
  "softbuffer",
  "strum",
+ "termpal",
  "thiserror",
  "trycmd",
  "tui",
@@ -3081,6 +3082,14 @@ checksum = "633c1a546cee861a1a6d0dc69ebeca693bf4296661ba7852b9d21d159e0506df"
 dependencies = [
  "libc",
  "winapi",
+]
+
+[[package]]
+name = "termpal"
+version = "0.1.0"
+source = "git+https://github.com/thomcc/termpal?rev=3251c38ea2899aab5744dfc46ef4cedf640b6794#3251c38ea2899aab5744dfc46ef4cedf640b6794"
+dependencies = [
+ "cfg-if 1.0.0",
 ]
 
 [[package]]

@@ -46,6 +46,7 @@ pub struct TerminalOptions {
     colors: ColorMode,
 
     characters: CharacterMode,
+    termpal: bool,
 }
 
 impl TerminalOptions {
@@ -73,6 +74,7 @@ impl Default for TerminalOptions {
         Self {
             colors: ColorMode::TwoFiftySix, // TODO: default to 16-color mode once we have it implemented
             characters: CharacterMode::Split,
+            termpal: true,
         }
     }
 }
@@ -275,7 +277,17 @@ impl TerminalMain {
                     Event::Key(KeyEvent {
                         code: KeyCode::Char('n'),
                         modifiers: _,
-                    }) => self.options.colors = self.options.colors.cycle(),
+                    }) => {
+                        self.options.colors = self.options.colors.cycle();
+                        // self.sync_viewport();
+                    }
+                    Event::Key(KeyEvent {
+                        code: KeyCode::Char('t'),
+                        modifiers: _,
+                    }) => {
+                        self.options.termpal = !self.options.termpal;
+                        // self.sync_viewport();
+                    }
                     Event::Key(KeyEvent {
                         code: KeyCode::Char('m'),
                         modifiers: _,
@@ -521,8 +533,8 @@ impl TerminalMain {
 
                 f.render_widget(
                     Paragraph::new(format!(
-                        "Colors: {:?}\nChars: {:?}",
-                        self.options.colors, self.options.characters
+                        "Colors: {:?} (Perceptual: {:?})\nChars: {:?}",
+                        self.options.colors, self.options.termpal, self.options.characters
                     )),
                     colors_info_rect,
                 );
@@ -699,8 +711,8 @@ impl TerminalMain {
                     },
                 )
             } else {
-                let color1 = options.colors.convert(color1);
-                let color2 = options.colors.convert(color2);
+                let color1 = options.colors.convert(color1, options.termpal);
+                let color2 = options.colors.convert(color2, options.termpal);
                 if color1 == color2 {
                     (
                         // TODO: Offer choice of showing character sometimes. Also use characters for dithering.
@@ -725,7 +737,7 @@ impl TerminalMain {
             let (ref text, color) = image[char_pos.y * row + char_pos.x];
             match options.characters {
                 CharacterMode::Names => {
-                    let mapped_color = match options.colors.convert(color) {
+                    let mapped_color = match options.colors.convert(color, options.termpal) {
                         Some(color) => Colors::new(Color::Black, color),
                         None => Colors::new(Color::Reset, Color::Reset),
                     };
@@ -862,14 +874,14 @@ impl ColorMode {
     ///   (i.e. the "not colored" colors).
     /// * This function returns [`None`] if color is disabled and no color control
     ///   sequences should be produced — i.e. the input is ignored.
-    fn convert(self, input: Option<Rgba>) -> Option<Color> {
-        match (input, self) {
+    fn convert(self, input: Option<Rgba>, perceptual: bool) -> Option<Color> {
+        match (input, self, perceptual) {
             // Mode None produces no output no matter what.
-            (_, ColorMode::None) => None,
+            (_, ColorMode::None, _) => None,
             // Input None means Reset.
-            (None, _) => Some(Color::Reset),
+            (None, _, _) => Some(Color::Reset),
             // ColorMode::Sixteen => {}
-            (Some(rgba), ColorMode::TwoFiftySix) => {
+            (Some(rgba), ColorMode::TwoFiftySix, false) => {
                 // The 256-color palette consists of
                 // * the original 16 "ANSI" colors,
                 // * a 216-color 6×6×6 RGB color cube (unevenly divided) starting at index 16,
@@ -917,7 +929,12 @@ impl ColorMode {
 
                 Some(Color::AnsiValue(ansi_color))
             }
-            (Some(rgba), ColorMode::Rgb) => {
+            (Some(rgba), ColorMode::TwoFiftySix, true) => {
+                let [r, g, b, _] = rgba.to_srgb8();
+                let ansi = termpal::nearest_ansi256(r, g, b);
+                Some(Color::AnsiValue(ansi))
+            }
+            (Some(rgba), ColorMode::Rgb, _) => {
                 let [r, g, b, _] = rgba.to_srgb8();
                 let c = Color::Rgb { r, g, b };
                 Some(c)
